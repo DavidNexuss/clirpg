@@ -28,6 +28,8 @@ class NPC : public Character
     void printNPCStatus();
 
     void queryInfo(Character* p);
+
+    void step(Character* other);
 };
 
 NPC getRandomNPC(bool friendly,int hardness);

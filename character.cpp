@@ -79,7 +79,7 @@ int Character::getArmor() {
         armorVal += inventory[armor[i]].type == ARMOR ? inventory[armor[i]].val / 10.0 : 1;
     return armorVal;
 }
-bool Character::alive() {return health > 0;}
+bool Character::alive() { return health > 0; }
 
 void Character::kill()
 {

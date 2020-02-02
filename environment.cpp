@@ -2,7 +2,9 @@
 #include "util.h"
 #include "materials.h"
 #include <iostream>
+#include <algorithm>
 using namespace std;
+
 Environment::Environment(int _hardness)
 {   
     hardness = _hardness;
@@ -12,7 +14,7 @@ Environment::Environment(int _hardness)
     {
         addNPC(getRandomNPC(RANDOM(2) > 1,hardness));
     }
-    l = (int)RANDOM(5) / (l + 1);
+    l = (int)RANDOM(5);
     for (size_t i = 0; i < l; i++)
     {
         addItem(getHardnessItem(hardness * 100));
@@ -35,8 +37,8 @@ void Environment::addItem(Item item)
 
 void Environment::step()
 {
-        for (size_t i = 0; i < npcs.size(); i++)
-        for (size_t j = 0; j < npcs.size(); j++)
+    for (size_t i = 0; i < npcs.size(); i++)
+    for (size_t j = 0; j < npcs.size(); j++)
         {
             if (i == j) continue;
 
@@ -49,16 +51,26 @@ void Environment::step()
                 npcs[i].proccessEvent(&npcs[j],EVENT_NONE);
                 if (npcs[i].getRela(&npcs[j]) < -20 * (RANDOM(1) + 1))
                 {
-                    npcs[j].takeDamage(&npcs[i]);
-                    npcs[j].proccessEvent(&npcs[i],EVENT_ATTACK);
+                    attackNPC(&npcs[i],&npcs[j]);
                 }
         }
-}
 
+        
+}
+int Environment::countAlive()
+{
+    int j = 0;
+    for (size_t i = 0; i < npcs.size(); i++)
+    {
+        if (npcs[i].alive())j++;
+    }
+    return j;
+    
+}
 void Environment::printEnvironment()
 {
     cout << "Name: " << name << " Hardness: " << hardness << endl;
-    cout << "NPCS: " << npcs.size() << endl;
+    cout << "NPCS: " << countAlive() << endl;
     for (size_t i = 0; i < npcs.size(); i++)
     {
         npcs[i].printCharacter(true);
@@ -70,13 +82,57 @@ void Environment::printEnvironment()
     }
 }
 
+void Environment::fightPeopleMenu(Character* p,NPC* a)
+{
+    if (!p->alive()) return;
+    cout << "Fighting " << a->name << endl;
+    p->printCharacter(false);
+    a->queryInfo(p);
+    cout << "Enemy HP: " << a->getHealth() << endl;
+    cout << "1) Use "; p->getActive().printItem(); cout << endl;
+    cout << "2) Change inventory " << endl;
+    cout << "3) Flee " << endl;
+
+    int response;
+    cin >> response;
+    if (response < 0 || response > 3) return fightPeopleMenu(p,a);
+
+    if (response == 1)
+    {
+        Item& active = p->getActive();
+        if (active.type == MISC || active.type == ARMOR || active.type == 0)
+        {
+            cout << "Invalid active" << endl;
+            return fightPeopleMenu(p,a);
+        }
+
+        if (active.type == WEAPON)
+        {
+            if (attackNPC(p,a)) cout << a->name << " defeated! " << endl;
+        }
+        else if (active.type == FOOD) p->consumeActive();
+    }
+    else if (response == 2)
+    {
+        p->queryInventoryMenu();
+    }
+    
+    if (response != 3 && a->alive())
+    {
+        a->step(p);
+        return fightPeopleMenu(p,a);
+    }
+}
 void Environment::meetPeopleMenu(Character* p)
 {
 
     for (size_t i = 0; i < npcs.size(); i++)
     {
-        cout << "[" << i << "]";
-        npcs[i].queryInfo(p);
+        if (npcs[i].alive())
+        {
+            cout << "[" << i << "]";
+            npcs[i].queryInfo(p);
+        }
     }
     cout << "What do you want to do?" << endl;
     cout << "1) Attack" << endl;
@@ -106,7 +162,7 @@ void Environment::meetPeopleMenu(Character* p)
     switch (response)
     {
     case 1:
-        attack(p,&npcs[response2]);
+        fightPeopleMenu(p,&npcs[response2]);
         break;
     case 2:
         talk(p,&npcs[response2]);
@@ -117,13 +173,13 @@ void Environment::meetPeopleMenu(Character* p)
     
     }
 }
-void Environment::queryOptions(Character* p)
+bool Environment::queryOptions(Character* p)
 {
     
     p->printCharacter(false);
     cout << "This is the land of the " << name << endl;
     cout << "Seams to be a " << toughness[MIN(hardness,TOUGH_SIZE - 1)] << " place" << endl;
-    cout << "You can see " << npcs.size() << " people" << endl;
+    cout << "You can see " << countAlive() << " people" << endl;
     cout << "What do you want to do?" << endl;
 
     cout << "1) Meet people" << endl;
@@ -156,6 +212,8 @@ void Environment::queryOptions(Character* p)
         cout << "Nothing found" << endl;
     }
     break;
+    case 3:
+        return 1;
     case 4:
         p->queryInventoryMenu();
         break;
@@ -163,22 +221,41 @@ void Environment::queryOptions(Character* p)
     default:
         break;
     }
+    return 0;
 }
 
+int Environment::getHardness() 
+{ 
+    return hardness; 
+}
 
-void attack(Character* a,NPC* other)
+bool attack(Character* a,Character* b)
 {
-    cout << a->name << "->" << "attacks " << other->name << endl;
+    cout << a->name << "->" << " attacks " << b->name << endl;
+    if (b->takeDamage(a))
+    {
+         a->addXP(b->getXP());
+         return true;
+    }
+    a->addXP(5); 
+    return false;
+}
+void talk(Character* a,Character* b)
+{
+    cout << a->name << "->" << " talks " << b->name << endl;
+    a->addXP((int)(RANDOM(3)));
+}
+
+bool attackNPC(Character* a,NPC* other)
+{
+    if (attack(a,other)) return true;
     other->meet(a,0);
     other->proccessEvent(a,EVENT_ATTACK);
-    if (other->takeDamage(a)) a->addXP(other->getXP());
-    a->addXP(5);
 }
 
-void talk(Character* a,NPC* other)
+void talkNPC(Character* a,NPC* other)
 {
-    cout << a->name << "->" << "talks " << other->name << endl;
+    talk(a,other);
     other->meet(a,RANDOM(30)+5);
     other->proccessEvent(a,EVENT_TALK);
-    a->addXP((int)(RANDOM(3)));
 }

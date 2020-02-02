@@ -1,5 +1,6 @@
 #include "npc.h"
 #include "materials.h"
+#include "environment.h"
 #include "util.h"
 #include <iostream>
 using namespace std;
@@ -111,12 +112,11 @@ void NPC::queryInfo(Character* p)
 {
     
     int ratio = getStrength() / p->getStrength();
-    cout << "Known information of " + name << endl;
+    cout << "Known information of " << name << " ";
     int know = getKnowLevel();
     if (know < 2){
 
         cout << "Seams to be a " << toughness[MIN(ratio,TOUGH_SIZE - 1)] << " guy" << endl; 
-        cout << "I don't know! " << endl;
         if (know == 1) cout << "Seams to be " << (friendly ? "friendly" : "unfriendly") << " though." << endl;
     }
 
@@ -132,6 +132,19 @@ void NPC::queryInfo(Character* p)
     }
 }
 
+void NPC::step(Character* other)
+{
+    chooseActive();
+    chooseArmor();
+
+    if (other != nullptr)
+    {
+        if (getRela(other) < 30)
+        {
+            attack(this,other);
+        }
+    }
+}
 NPC getRandomNPC(bool friendly,int hardness)
 {
     NPC npc(getRandomName(),friendly,hardness);
